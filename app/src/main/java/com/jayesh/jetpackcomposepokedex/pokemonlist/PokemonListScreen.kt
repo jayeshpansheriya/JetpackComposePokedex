@@ -24,6 +24,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltNavGraphViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.ImagePainter
@@ -39,7 +40,8 @@ import java.util.*
 
 @Composable
 fun PokemonListScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: PokemonListViewModel = hiltNavGraphViewModel()
 ) {
     Surface(
         color = MaterialTheme.colors.background,
@@ -60,7 +62,7 @@ fun PokemonListScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-
+                viewModel.searchPokemonList(it)
             }
             Spacer(modifier = Modifier.height(16.dp))
             PokemonList(navController = navController)
@@ -97,7 +99,7 @@ fun SearchBar(
                 .background(Color.White, CircleShape)
                 .padding(horizontal = 20.dp, vertical = 12.dp)
                 .onFocusChanged {
-                    isHintDisplayed = it.isFocused
+                    isHintDisplayed = it.isFocused && text.isEmpty()
                 }
         )
         if(isHintDisplayed) {
@@ -114,12 +116,13 @@ fun SearchBar(
 @Composable
 fun PokemonList(
     navController: NavController,
-    viewModel: PokemonListViewModel = hiltViewModel()
+    viewModel: PokemonListViewModel = hiltNavGraphViewModel()
 ) {
     val pokemonList by remember { viewModel.pokemonList }
     val endReached by remember { viewModel.endReached }
     val loadError by remember { viewModel.loadError }
     val isLoading by remember { viewModel.isLoading }
+    val isSearching by remember { viewModel.isSearching }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         val itemCount = if(pokemonList.size % 2 == 0) {
@@ -128,8 +131,10 @@ fun PokemonList(
             pokemonList.size / 2 + 1
         }
         items(itemCount) {
-            if(it >= itemCount - 1 && !endReached) {
-                viewModel.loadPokemonPaginated()
+            if(it >= itemCount - 1 && !endReached && !isLoading && !isSearching) {
+                LaunchedEffect(key1 = true) {
+                    viewModel.loadPokemonPaginated()
+                }
             }
             PokedexRow(rowIndex = it, entries = pokemonList, navController = navController)
         }
@@ -156,7 +161,7 @@ fun PokedexEntry(
     entry: PokedexListEntry,
     navController: NavController,
     modifier: Modifier = Modifier,
-    viewModel: PokemonListViewModel = hiltViewModel()
+    viewModel: PokemonListViewModel = hiltNavGraphViewModel()
 ) {
     val defaultDominantColor = MaterialTheme.colors.surface
     val random = Random()
@@ -188,7 +193,7 @@ fun PokedexEntry(
             )
             .clickable {
                 navController.navigate(
-                    "pokemon_detail_screen/${dominantColor.toArgb()}/${entry.pokemonName}"
+                    "pokemon_detail_screen/${entry.pokemonName}"
                 )
             }
     ) {
@@ -206,13 +211,12 @@ fun PokedexEntry(
                 if(painterState is ImagePainter.State.Loading)
                 {
                     CircularProgressIndicator(
-                    color = MaterialTheme.colors.primary,
-                    modifier = Modifier.scale(0.5f)
-                )
+                        color = MaterialTheme.colors.primary,
+                        modifier = Modifier.scale(0.5f)
+                    )
 
                 }
             }
-
             Text(
                 text = entry.pokemonName,
                 fontFamily = RobotoCondensed,
